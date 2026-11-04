@@ -3,7 +3,7 @@ import './handoff-contract.js';
 import {mountRegions} from './regions.js';
 import {createBridge} from './bridge-client.js';
 import {names,types,fromSource,storeLines,validate,fingerprint,makePlan} from './model.js';
-import {readSelected,readSelectedBatch,watchSelection,watchRecord} from './feishu.js';
+import {readSelected,readSelectedBatch,watchSelection,watchRecord,writeStatus} from './feishu.js';
 import {demo} from './demo.js';
 
 export function mountEditor(host,initialSource,index=0,sharedBridge=null){
@@ -50,7 +50,7 @@ function invalidate(){if(!source||isDemo)return;stale=true;invalidateVerificatio
 async function load(){if(busy)return;if(draft&&saveVersion&& !confirm('重新读取会替换当前标准方案，是否继续？'))return;setBusy(true);$('error').textContent='';
  try{selectedRecords=[initialSource];
  const next=selectedRecords[0];unwatch?.();source=next;draft=fromSource(next);stale=false;saveVersion=0;valuesToControls();render();$('saved').textContent='';$('message').textContent=isDemo?'离线演示':`已读取 ${selectedRecords.length} 条申请`;
- if(!isDemo)unwatch=await watchRecord(source.tableId,()=>invalidate());
+ if(!isDemo)unwatch=await watchRecord(source.tableId,async()=>{try{const latest=await readSelected(source.recordId);if(fingerprint(latest)!==fingerprint(source))invalidate();}catch{if(!busy&&!finished)invalidate();}});
  }catch(e){fail(e);}finally{setBusy(false);render();}}
 async function ensureFresh(){if(stale)throw Error('源需求已变化，请重新读取。');if(!isDemo){const latest=await readSelected(source.recordId);if(fingerprint(latest)!==fingerprint(source)){invalidate();throw Error('需求已变化，原预览失效，请重新读取。');}}}
 $('read').onclick=load;
@@ -67,6 +67,10 @@ async function execute(){
   $('execution-result').textContent='核验通过，正在'+(draft.action==='restore'?'恢复':'剔除')+'…';submitting=true;
   const message=await bridge.submit(response.ticket);finished=true;const result=message.result;
   $('execution-result').textContent=result.status==='success'?'已完成':result.status==='partial'?'部分完成，请查看工作台同步记录':result.error||'结果待核实，请查看工作台同步记录';
+  if(result.status==='success'){
+   try{const note=isDemo?'离线演示，未写入表格':await writeStatus(source,draft.action);$('execution-result').textContent='已完成 · '+note;}
+   catch(error){$('execution-result').textContent='活动已完成，表格回填失败：'+error.message;const retry=document.createElement('button');retry.type='button';retry.className='button';retry.textContent='仅重试回填';$('execution-result').append(document.createElement('br'),retry);retry.onclick=async()=>{retry.disabled=true;try{const note=await writeStatus(source,draft.action);$('execution-result').textContent='已完成 · '+note;}catch(e){fail(e);retry.disabled=false;}};}
+  }
   return {status:result.status==='success'?'success':'uncertain'};
  }catch(e){if(submitting)finished=true;fail(e);$('execution-result').textContent=submitting?'结果待核实，未自动重试，请查看同步记录':'核验失败，未提交';return {status:submitting?'uncertain':'invalid'};}
  finally{setBusy(false);render();}
