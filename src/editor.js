@@ -6,13 +6,13 @@ import {names,types,fromSource,storeLines,validate,fingerprint,makePlan} from '.
 import {readSelected,readSelectedBatch,watchSelection,watchRecord,writeStatus} from './feishu.js';
 import {demo} from './demo.js';
 
-export function mountEditor(host,initialSource,index=0,sharedBridge=null){
+export function mountEditor(host,initialSource,index=0,sharedBridge=null,receiptTarget=null){
 const isDemo=new URLSearchParams(location.search).get('demo')==='1';
 const publicSite=import.meta.env.VITE_PUBLIC_SITE==='1';
 let selectedRecords=[];
 let verified=null,finished=false;const bridge=sharedBridge||createBridge();
 let source=null,draft=null,stale=false,busy=false,unwatch=null,saveVersion=0;
-const $=id=>host.querySelector('#record-'+index+'-'+id);
+const $=id=>id==='execution-result'&&receiptTarget?receiptTarget:host.querySelector('#record-'+index+'-'+id);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const field=(id,label,type='text')=>`<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" autocomplete="off"></div>`;
 const select=(id,label,options)=>`<div class="field"><label for="${id}">${label}</label><select id="${id}">${options.map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></div>`;
@@ -25,12 +25,12 @@ host.innerHTML=`<header><div><h1>活动操作预览</h1>${isDemo?'<span class="h
 <div class="form-actions"><button class="button primary" id="save">核验方案</button></div><p class="status" id="saved" hidden></p><p id="execution-result" class="status" role="status"></p></section>
 </div>
 <p class="footer">商品工作台 · 0.7</p></main><div id="toast" class="toast" role="status" hidden></div>`.replace(/\b(id|for)="([^" ]+)"/g,(_,attr,id)=>attr+'="record-'+index+'-'+id+'"');
-host.querySelector('header').hidden=true;$('read').hidden=true;$('connect').hidden=true;$('message').hidden=true;host.querySelector('.footer').hidden=true;
+if(receiptTarget)host.querySelector('[id$="-execution-result"]').hidden=true;host.querySelector('header').hidden=true;$('read').hidden=true;$('connect').hidden=true;$('message').hidden=true;host.querySelector('.footer').hidden=true;
 const controls=['activityId','activityName','activityType','stores','confirmed'];
 const regionPicker=mountRegions($('region-picker'),{onEdit(state){if(!draft)return;draft.regions=state.regions;draft.regionsDirty=state.dirty;invalidateVerification();saveVersion++;render();},onCommit(regions){if(!draft)return;draft.regions=regions;draft.regionsDirty=false;invalidateVerification();saveVersion++;render();}});
 function invalidateVerification(){verified=null;finished=false;if(draft)draft.confirmed=false;$('confirmed').checked=false;$('execution-result').textContent='';bridge.invalidate();}
 
-function fail(e){$('error').textContent=e?.message||String(e);}
+function fail(e){const message=e?.message||String(e);if(receiptTarget)receiptTarget.textContent=message;else $('error').textContent=message;}
 function toast(s){$('toast').textContent=s;$('toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').hidden=true,3500);}
 function setBusy(on){busy=on;$('loading').hidden=!on;$('read').disabled=on;$('save').disabled=on||!draft;for(const key of controls)$(key).disabled=on;for(const el of host.querySelectorAll('[name=action],[name=scope]'))el.disabled=on;regionPicker.setBusy(on);}
 function valuesToControls(){invalidateVerification();regionPicker.reset(draft.regions||[]);for(const el of host.querySelectorAll('[name=scope]'))el.checked=el.value===draft.scope;for(const el of host.querySelectorAll('[name=action]'))el.checked=el.value===(draft.action||'exclude');for(const key of controls){if(key==='confirmed')$(key).checked=draft[key];else $(key).value=draft[key]||'';}}
@@ -72,7 +72,7 @@ async function execute(){
    catch(error){$('execution-result').textContent='活动已完成，表格回填失败：'+error.message;const retry=document.createElement('button');retry.type='button';retry.className='button';retry.textContent='仅重试回填';$('execution-result').append(document.createElement('br'),retry);retry.onclick=async()=>{retry.disabled=true;try{const note=await writeStatus(source,draft.action);$('execution-result').textContent='已完成 · '+note;}catch(e){fail(e);retry.disabled=false;}};}
   }
   return {status:result.status==='success'?'success':'uncertain'};
- }catch(e){if(submitting)finished=true;fail(e);$('execution-result').textContent=submitting?'结果待核实，未自动重试，请查看同步记录':'核验失败，未提交';return {status:submitting?'uncertain':'invalid'};}
+ }catch(e){if(submitting)finished=true;fail(e);$('execution-result').textContent=(submitting?'结果待核实，未自动重试，请查看同步记录：':'核验失败，未提交：')+e.message;return {status:submitting?'uncertain':'invalid'};}
  finally{setBusy(false);render();}
 }
 $('save').hidden=true;host.querySelector('.form-actions').hidden=true;
