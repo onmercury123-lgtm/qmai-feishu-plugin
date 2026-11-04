@@ -1,0 +1,28 @@
+/* 商品工作台 UI v1.0 — canonical reusable tokens */
+:root {
+  --ui-primary-gradient: linear-gradient(120deg,#9178f3,#6847ff);
+  --ui-primary-hover: #704bfa;
+  --ui-primary-accent: #7652ff;
+  --ui-page-bg: #f5f5f7;
+  --ui-sidebar-bg: #f2f2f5;
+  --ui-panel-bg: #f5f5f7;
+  --ui-header-gradient:linear-gradient(105deg,#f4efff 0%,#eee7ff 52%,#e9edff 100%);
+  --ui-purple-action: hsl(256 58% 59%);
+  --ui-purple-text: hsl(256 26% 51%);
+  --ui-purple-muted: hsl(256 16% 65%);
+  --ui-purple-accent: hsl(256 39% 66%);
+  --selection-text: var(--ui-purple-text);
+  --selection-bg: hsl(256 70% 98%);
+  --selection-active: hsl(256 58% 95%);
+  --selection-accent: var(--ui-purple-accent);
+  --ui-placeholder: hsl(256 18% 72%);
+  --ui-border: hsl(256 42% 92%);
+  --ui-success: #4f9676;
+  --ui-error: #bb5864;
+  --ui-restore: #6b91df;
+  --ui-table-heading: linear-gradient(105deg,#f4efff 0%,#efedff 52%,#eaf2ff 100%);
+  --ui-font-regular: 400;
+  --ui-font-emphasis: 600;
+  --ui-control-radius: 9px;
+  --ui-card-radius: 17px;
+}
