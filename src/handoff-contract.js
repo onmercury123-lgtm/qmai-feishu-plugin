@@ -11,6 +11,7 @@ function regionalInfo(value){if(value==null)return [];if(!Array.isArray(value)||
    result.regions=p.regions.map(r=>({id:r.id,name:r.name,path:r.path}));result.stores=[];
   }
   if(p.participationActivities!=null)result.participationActivities=regionalInfo(p.participationActivities);
+  if(p.sourceRecords!=null){if(!Array.isArray(p.sourceRecords)||p.sourceRecords.length>100||p.sourceRecords.some(r=>!r||typeof r.baseId!=='string'||typeof r.tableId!=='string'||typeof r.recordId!=='string'||[r.baseId,r.tableId,r.recordId].some(v=>v.length>200)||!Array.isArray(r.stores)||r.stores.length>1000||r.stores.some(v=>typeof v!=='string'||v.length>500)))throw Error('来源记录格式无效');result.sourceRecords=p.sourceRecords.map(r=>({baseId:r.baseId,tableId:r.tableId,recordId:r.recordId,stores:r.stores.slice()}));}
   return result;
  }
  function build(plan){const p=validate({version:2,...plan.standard});const data=encodeURIComponent(JSON.stringify(p));if(data.length>24000)throw Error('门店清单过长，请分批发送到工作台。');return 'http://127.0.0.1:8787/#feishu-plan='+data;}

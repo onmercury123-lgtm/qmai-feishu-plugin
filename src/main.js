@@ -2,6 +2,7 @@ import './style.css';
 import {createBridge} from './bridge-client.js';
 import {mountEditor} from './editor.js';
 import {readSelectedBatch} from './feishu.js';
+import {groupRecords} from './grouping.js';
 import {demo} from './demo.js';
 const isDemo=new URLSearchParams(location.search).get('demo')==='1';
 const app=document.getElementById('app');
@@ -15,8 +16,8 @@ async function load(){
  try{
   const records=isDemo?[structuredClone(demo),{...structuredClone(demo),recordId:'demo-second',display:{...demo.display,activityName:'总部-第二条活动示例',stores:'Y801019885'}}]:await readSelectedBatch();
   editors.forEach(e=>e.dispose());editors=[];list.replaceChildren();receipts.replaceChildren();receipts.hidden=true;progress.textContent='';
-  records.forEach((record,index)=>{const host=document.createElement('form');host.className='record-editor';host.onsubmit=e=>e.preventDefault();list.append(host);const receipt=document.createElement('div');receipt.className='receipt-row';receipt.hidden=true;const name=document.createElement('strong');name.textContent=record.display.activityName||record.display.activityId||'申请 '+(index+1);const result=document.createElement('p');result.className='status';result.setAttribute('role','status');receipt.append(name,result);receipts.append(receipt);editors.push(mountEditor(host,record,index,bridge,result));});
-  status.classList.toggle('has-records',records.length>0);batch.hidden=!records.length;execute.disabled=false;status.textContent=(isDemo?'离线演示 · ':'')+'已读取 '+records.length+' 条申请';
+  const groups=groupRecords(records);groups.forEach((record,index)=>{const host=document.createElement('form');host.className='record-editor';host.onsubmit=e=>e.preventDefault();list.append(host);const receipt=document.createElement('div');receipt.className='receipt-row';receipt.hidden=true;const name=document.createElement('strong');name.textContent=record.display.activityName||record.display.activityId||'申请 '+(index+1);const result=document.createElement('p');result.className='status';result.setAttribute('role','status');receipt.append(name,result);receipts.append(receipt);editors.push(mountEditor(host,record,index,bridge,result));});
+  status.classList.toggle('has-records',records.length>0);batch.hidden=!records.length;execute.disabled=false;status.textContent=(isDemo?'离线演示 · ':'')+'已读取 '+records.length+' 条申请 · '+groups.length+' 个执行任务';
  }catch(e){batch.hidden=false;error.textContent=e.message;}finally{loading=false;read.disabled=false;}
 }
 read.onclick=load;if(isDemo)load();
@@ -29,7 +30,7 @@ execute.onclick=async()=>{
   receipts.children[i].hidden=false;progress.textContent='正在处理 '+(i+1)+' / '+editors.length;const result=await editors[i].execute();
   if(result.status==='success'||result.status==='skipped')done++;else failed++;
   if(result.status==='uncertain'){error.textContent='执行结果待核实，剩余记录未执行，请查看工作台同步记录。';break;}
- }if(!error.textContent||error.textContent.startsWith('正在')){const failure=[...receipts.querySelectorAll('.receipt-row')].find(row=>{const message=row.querySelector('p').textContent;return message&&!message.startsWith('已完成');});const reason=failure?.querySelector('p').textContent.replace(/\s+/g,' ').trim();progress.textContent='已完成 '+done+' 条'+(failed?'，未完成 '+failed+' 条':'')+(reason?'；'+reason:'');}const details=receipts.textContent;progress.title=details;if(details.includes('表格回填失败')){const row=[...receipts.querySelectorAll('.receipt-row p')].find(p=>p.textContent.includes('表格回填失败'));progress.textContent=row.textContent.replace('仅重试回填','').replace(/\s+/g,' ').trim();}for(const button of receipts.querySelectorAll('button')){const row=button.closest('.receipt-row');const retry=button.onclick;button.onclick=async()=>{await retry();progress.textContent=row.querySelector('p').textContent.split('\n')[0];};retryArea.append(button);}}
+ }if(!error.textContent||error.textContent.startsWith('正在')){const failure=[...receipts.querySelectorAll('.receipt-row')].find(row=>{const message=row.querySelector('p').textContent;return message&&!message.startsWith('已完成');});const reason=failure?.querySelector('p').textContent.replace(/\s+/g,' ').trim();progress.textContent='已完成 '+done+' 个任务'+(failed?'，未完成 '+failed+' 个任务':'')+(reason?'；'+reason:'');}const details=receipts.textContent;progress.title=details;if(details.includes('表格回填失败')){const row=[...receipts.querySelectorAll('.receipt-row p')].find(p=>p.textContent.includes('表格回填失败'));progress.textContent=row.textContent.replace('仅重试回填','').replace(/\s+/g,' ').trim();}for(const button of receipts.querySelectorAll('button')){const row=button.closest('.receipt-row');const retry=button.onclick;button.onclick=async()=>{await retry();progress.textContent=row.querySelector('p').textContent.split('\n')[0];};retryArea.append(button);}}
  catch(e){progress.textContent='未执行：'+(e.message||String(e));}
  finally{running=false;list.inert=false;read.disabled=false;execute.disabled=editors.every(e=>e.isFinished());}
 };

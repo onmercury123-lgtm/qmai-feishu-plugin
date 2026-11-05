@@ -4,10 +4,12 @@ import {mountRegions} from './regions.js';
 import {createBridge} from './bridge-client.js';
 import {names,types,fromSource,storeLines,validate,fingerprint,makePlan} from './model.js';
 import {readSelected,readSelectedBatch,watchSelection,watchRecord,writeStatus} from './feishu.js';
+import {groupParticipation} from './grouping.js';
 import {demo} from './demo.js';
 
 export function mountEditor(host,initialSource,index=0,sharedBridge=null,receiptTarget=null){
 const isDemo=new URLSearchParams(location.search).get('demo')==='1';
+const members=initialSource.members||[initialSource];let pendingWriteback=[];
 const publicSite=import.meta.env.VITE_PUBLIC_SITE==='1';
 let selectedRecords=[];
 let verified=null,finished=false;const bridge=sharedBridge||createBridge();
@@ -19,7 +21,7 @@ const select=(id,label,options)=>`<div class="field"><label for="${id}">${label}
 host.innerHTML=`<header><div><h1>活动操作预览</h1>${isDemo?'<span class="header-note">离线演示</span>':''}</div><button class="button primary" id="read">${isDemo?'载入演示':'读取所选'}</button></header>
 <main class="is-empty" id="main-content"><section class="read-status"><p id="message" class="status" role="status" aria-live="polite">勾选表格记录后，点击右上方读取所选</p><button class="button ghost" id="connect">检查工作台</button><p id="connection" class="status" hidden></p><div id="loading" class="loading" hidden></div><p class="error" id="error" role="alert"></p></section>
 <div class="columns" id="editor" hidden><section class="card"><div class="section-heading"><h2>${escape(initialSource.display.activityName||initialSource.display.activityId)}</h2><span class="section-note">按需修改</span></div>
-<p class="record-scope">${escape(initialSource.display.stores||'范围待确认')}</p><details class="record-settings"><summary>修改活动与范围</summary>${field('activityName','活动名称')}<div class="pair activity-pair">${select('activityType','活动类型',[['','请选择'],...types.map(t=>[t,t])])}${field('activityId','活动 ID')}</div>
+${members.length>1?'<p class="status">合并 '+members.length+' 条申请</p>':''}<p class="record-scope">${escape(initialSource.display.stores||'范围待确认')}</p><details class="record-settings"><summary>修改活动与范围</summary>${field('activityName','活动名称')}<div class="pair activity-pair">${select('activityType','活动类型',[['','请选择'],...types.map(t=>[t,t])])}${field('activityId','活动 ID')}</div>
 <div class="field"><div class="label-row"><label for="stores">门店清单</label><span class="hint" id="count"></span></div><fieldset class="scope-options"><legend class="sr-only">门店选择方式</legend><label><input type="radio" name="scope" value="stores" checked>输入门店</label><label><input type="radio" name="scope" value="region">按区域选择</label></fieldset><textarea id="stores" placeholder="粘贴门店名称、编码或 ID，支持空格、换行、顿号或逗号分隔"></textarea><div id="region-picker" hidden></div></div>
 </details><fieldset class="execution"><legend>执行方式</legend><label><input type="radio" name="action" value="exclude" checked><span>立即剔除</span></label><label><input type="radio" name="action" value="restore"><span>立即恢复</span></label></fieldset><p class="error" id="issues"></p><div id="verified-result" hidden></div><label class="check" id="confirm-row" hidden><input id="confirmed" type="checkbox"><span>已核对实际门店与操作</span></label>
 <div class="form-actions"><button class="button primary" id="save">核验方案</button></div><p class="status" id="saved" hidden></p><p id="execution-result" class="status" role="status"></p></section>
@@ -50,26 +52,27 @@ function invalidate(){if(!source||isDemo)return;stale=true;invalidateVerificatio
 async function load(){if(busy)return;if(draft&&saveVersion&& !confirm('重新读取会替换当前标准方案，是否继续？'))return;setBusy(true);$('error').textContent='';
  try{selectedRecords=[initialSource];
  const next=selectedRecords[0];unwatch?.();source=next;draft=fromSource(next);stale=false;saveVersion=0;valuesToControls();render();$('saved').textContent='';$('message').textContent=isDemo?'离线演示':`已读取 ${selectedRecords.length} 条申请`;
- if(!isDemo)unwatch=await watchRecord(source.tableId,async()=>{try{const latest=await readSelected(source.recordId);if(fingerprint(latest)!==fingerprint(source))invalidate();}catch{if(!busy&&!finished)invalidate();}});
+ if(!isDemo)unwatch=await watchRecord(source.tableId,async()=>{if(busy||finished)return;try{for(const member of members){const latest=await readSelected(member.recordId);if(fingerprint(latest)!==fingerprint(member)){invalidate();break;}}}catch{if(!busy&&!finished)invalidate();}});
  }catch(e){fail(e);}finally{setBusy(false);render();}}
-async function ensureFresh(){if(stale)throw Error('源需求已变化，请重新读取。');if(!isDemo){const latest=await readSelected(source.recordId);if(fingerprint(latest)!==fingerprint(source)){invalidate();throw Error('需求已变化，原预览失效，请重新读取。');}}}
+async function ensureFresh(){if(stale)throw Error('源需求已变化，请重新读取。');if(!isDemo){for(const member of members){const latest=await readSelected(member.recordId);if(fingerprint(latest)!==fingerprint(member)){invalidate();throw Error('需求已变化，原预览失效，请重新读取。');}}}}
 $('read').onclick=load;
 $('connect').onclick=async()=>{if(busy)return;$('connection').hidden=false;$('connect').disabled=true;$('connection').textContent='正在检查本机工作台';try{const r=await fetch('/api/workbench/health');const d=await r.json();$('connection').textContent=d.connected?`工作台在线（${d.version}）；真实核验与执行接口尚未接入插件`:'工作台未连接；仍可编辑标准预览';}catch{$('connection').textContent='本地插件服务不可用，请通过启动文件打开';}finally{$('connect').disabled=false;}};
 if(publicSite)$('connect').hidden=true;
+async function writeMembers(){if(isDemo){pendingWriteback=[];return '离线演示，未写入表格';}const failed=[],errors=[];for(const member of pendingWriteback){try{await writeStatus(member,draft.action);}catch(e){failed.push(member);errors.push(e.message);}}pendingWriteback=failed;if(errors.length)throw Error(failed.length+' 条回填失败：'+errors[0]);return '已回填 '+members.length+' 条申请';}
 async function execute(){
  if(busy||finished)return {status:finished?'skipped':'busy'};
  $('error').textContent='';const errors=validate({...draft,confirmed:true});if(errors.length){fail(Error(errors.join('；')));return {status:'invalid'};}
  const version=saveVersion;let submitting=false;setBusy(true);$('execution-result').textContent='正在核验…';
  try{
   await ensureFresh();await bridge.open();
-  const plan=makePlan(source,{...draft,confirmed:true}),p=globalThis.WorkbenchHandoff.validate({version:2,...plan.standard});
+  const plan=makePlan(source,{...draft,confirmed:true}),p=globalThis.WorkbenchHandoff.validate({version:2,...plan.standard,participationActivities:groupParticipation(source,draft),sourceRecords:members.map(m=>({baseId:m.baseId||'',tableId:m.tableId,recordId:m.recordId,stores:storeLines(m.display.stores)}))});
   const response=await bridge.prepare(p);if(version!==saveVersion)throw Error('方案已变化，请重新执行');await ensureFresh();
   $('execution-result').textContent='核验通过，正在'+(draft.action==='restore'?'恢复':'剔除')+'…';submitting=true;
   const message=await bridge.submit(response.ticket);finished=true;const result=message.result;
   $('execution-result').textContent=result.status==='success'?'已完成':result.status==='partial'?'部分完成，请查看工作台同步记录':result.error||'结果待核实，请查看工作台同步记录';
   if(result.status==='success'){
-   try{const note=isDemo?'离线演示，未写入表格':await writeStatus(source,draft.action);$('execution-result').textContent='已完成 · '+note;}
-   catch(error){$('execution-result').textContent='活动已完成，表格回填失败：'+error.message;const retry=document.createElement('button');retry.type='button';retry.className='button';retry.textContent='仅重试回填';$('execution-result').append(document.createElement('br'),retry);retry.onclick=async()=>{retry.disabled=true;try{const note=await writeStatus(source,draft.action);$('execution-result').textContent='已完成 · '+note;}catch(e){fail(e);retry.disabled=false;}};}
+   try{pendingWriteback=members.slice();const note=await writeMembers();$('execution-result').textContent='已完成 · '+note;}
+   catch(error){$('execution-result').textContent='活动已完成，表格回填失败：'+error.message;const retry=document.createElement('button');retry.type='button';retry.className='button';retry.textContent='仅重试回填';$('execution-result').append(document.createElement('br'),retry);retry.onclick=async()=>{retry.disabled=true;try{const note=await writeMembers();$('execution-result').textContent='已完成 · '+note;}catch(e){fail(e);retry.disabled=false;}};}
   }
   return {status:result.status==='success'?'success':'uncertain'};
  }catch(e){if(submitting)finished=true;fail(e);$('execution-result').textContent=(submitting?'结果待核实，未自动重试，请查看同步记录：':'核验失败，未提交：')+e.message;return {status:submitting?'uncertain':'invalid'};}
