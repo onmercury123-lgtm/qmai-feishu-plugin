@@ -48,3 +48,5 @@ input,select,textarea{border:1px solid #d8d8df;color:var(--ui-text-body);backgro
 .toast{border-color:var(--ui-border);background:#fff;color:var(--ui-text-body);font-size:13px;font-weight:400}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--ui-primary-accent);outline-offset:2px}
 @media(max-width:440px){#app>header{padding:20px 16px}#app>main{padding:16px;gap:14px}#app>header h1{font-size:21px}.record-editor .card{padding:18px}.preview-title{gap:6px}.preview-heading-row{gap:10px!important}.page-heading-icon{width:24px;flex-basis:24px}#app .read-button{padding:9px 11px;font-size:13px}#batch-receipts{padding:16px 18px}}
+
+.plugin-version{margin:0;padding:8px 16px 14px;text-align:center;font-size:11px;font-weight:400;line-height:1.6;color:#969aa7}
