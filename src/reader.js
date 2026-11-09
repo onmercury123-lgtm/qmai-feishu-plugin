@@ -17,7 +17,9 @@ export async function readSelection(base,recordId){
  if(recordId&&!before.ids.includes(recordId))throw Error('这条申请已不在选中范围，请重新读取。');
  const ids=recordId?[recordId]:before.ids,metas=await before.table.getFieldMetaList(),fields={};
  for(const [key,name] of Object.entries(names)){
-  const matches=metas.filter(m=>(fieldAliases[key]||[name]).some(n=>normalize(n)===normalize(m.name)));
+  const aliases=fieldAliases[key]||[name];
+  const returnedIdFields=key==='regionActivityId'?metas.filter(m=>normalize(m.name)===normalize(aliases[0])):[];
+  const matches=returnedIdFields.length?returnedIdFields:metas.filter(m=>aliases.some(n=>normalize(n)===normalize(m.name)));
   if(matches.length>1)throw Error('存在多个可匹配的字段：'+matches.map(m=>m.name).join('、')+'，请先明确字段映射。');
   fields[key]=matches[0];
  }

@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readSelection} from '../src/reader.js';
+import {fromSource} from '../src/model.js';
+test('优先读取回传字段，长 ID 保持文本，X 占位符不进入计划',async()=>{
+ for(const value of ['1325056410861588480','XXXXXXXXXXXXXXXX']){
+  const base=fixture(),table=await base.getTableById(),fields=await table.getFieldMetaList();
+  fields.push({id:'oldId',name:'区域活动ID'},{id:'returnedId',name:'区域活动ID回传'});
+  const read=table.getCellString;
+  table.getCellValue=table.getCellString=async id=>id==='returnedId'?value:read(id);
+  const [record]=await readSelection(base);
+  assert.equal(record.display.regionActivityId,value);
+  assert.equal(fromSource(record).regionActivityId,value.startsWith('X')?'':value);
+ }
+});
 function fixture({ids=['rec1'],recordId=null,missing=false,change=false}={}){
  let calls=0;
  const fields=[['id','总部冲突活动ID'],['type','总部冲突活动类型'],['stores','剔除门店/区域'],['owner','总部活动设置人']].filter(([id])=>!missing||id!=='stores').map(([id,name])=>({id,name}));
