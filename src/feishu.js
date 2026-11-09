@@ -7,3 +7,5 @@ export async function watchRecord(tableId,callback){const table=await bitable.ba
 
 import {writeExecutionStatus} from './writeback.js';
 export const writeStatus=(source,action)=>writeExecutionStatus(bitable.base,source,action);
+
+export const readOriginal=async source=>(await readSelection(bitable.base,source.recordId,source))[0];

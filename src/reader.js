@@ -12,8 +12,8 @@ export async function selectedContext(base){
  return {selection,table,ids};
 }
 const normalize=s=>s.replace(/[\s（）()]/g,'').replaceAll('／','/');
-export async function readSelection(base,recordId){
- const before=await selectedContext(base);
+export async function readSelection(base,recordId,original=null){
+ const before=original?{selection:original,table:await base.getTableById(original.tableId),ids:[recordId]}:await selectedContext(base);
  if(recordId&&!before.ids.includes(recordId))throw Error('这条申请已不在选中范围，请重新读取。');
  const ids=recordId?[recordId]:before.ids,metas=await before.table.getFieldMetaList(),fields={};
  for(const [key,name] of Object.entries(names)){
@@ -30,7 +30,7 @@ export async function readSelection(base,recordId){
   await Promise.all(Object.keys(names).map(async key=>{const meta=fields[key];if(!meta){raw[key]=null;display[key]='';return;}fieldIds[key]=meta.id;raw[key]=await before.table.getCellValue(meta.id,id);display[key]=await before.table.getCellString(meta.id,id)??text(raw[key]);}));
   records.push({baseId:before.selection.baseId,tableId:before.selection.tableId,recordId:id,raw,display,fieldIds});
  }
- const after=await selectedContext(base),sameIds=(a,b)=>a.length===b.length&&a.every(id=>b.includes(id));
+ const after=original?before:await selectedContext(base),sameIds=(a,b)=>a.length===b.length&&a.every(id=>b.includes(id));
  if(before.selection.tableId!==after.selection.tableId||before.selection.viewId!==after.selection.viewId||!sameIds(before.ids,after.ids))throw Error('读取期间选中记录发生变化，请重新读取。');
  return records;
 }

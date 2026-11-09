@@ -1,9 +1,10 @@
+import {checkFreshness} from './freshness.js';
 import './style.css';
 import './handoff-contract.js';
 import {mountRegions} from './regions.js';
 import {createBridge} from './bridge-client.js';
 import {names,types,fromSource,storeLines,validate,fingerprint,makePlan} from './model.js';
-import {readSelected,readSelectedBatch,watchSelection,watchRecord,writeStatus} from './feishu.js';
+import {readSelected,readSelectedBatch,watchSelection,watchRecord,writeStatus,readOriginal} from './feishu.js';
 import {groupParticipation} from './grouping.js';
 import {demo} from './demo.js';
 
@@ -13,7 +14,7 @@ const members=initialSource.members||[initialSource];let pendingWriteback=[];
 const publicSite=import.meta.env.VITE_PUBLIC_SITE==='1';
 let selectedRecords=[];
 let verified=null,finished=false;const bridge=sharedBridge||createBridge();
-let source=null,draft=null,stale=false,busy=false,unwatch=null,saveVersion=0;
+let source=null,draft=null,stale=false,readIssue='',busy=false,unwatch=null,saveVersion=0;
 const $=id=>id==='execution-result'&&receiptTarget?receiptTarget:host.querySelector('#record-'+index+'-'+id);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const field=(id,label,type='text')=>`<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" autocomplete="off"></div>`;
@@ -39,7 +40,7 @@ function valuesToControls(){invalidateVerification();regionPicker.reset(draft.re
 function render(){if(!source||!draft)return;$('editor').hidden=false;$('main-content').classList.remove('is-empty');
  $('stores').hidden=draft.scope==='region';$('region-picker').hidden=draft.scope!=='region';
  $('count').textContent=verified?`${verified.summary.stores.length} 家 · 已核验`:draft.scope==='region'?(draft.regions?.length&&!draft.regionsDirty?'已确认 · 待核验':'请选择区域'):`${storeLines(draft.stores).length} 项 · 待核验`;
- const errors=validate({...draft,confirmed:true});if(stale)errors.unshift('源需求已变化，请重新读取');$('issues').textContent=errors.join('；');
+ const errors=validate({...draft,confirmed:true});if(stale)errors.unshift('原申请的活动或范围已变化，请重新读取');if(readIssue)errors.unshift(readIssue);$('issues').textContent=errors.join('；');
  $('save').textContent=busy?(verified?'正在执行…':'正在核验…'):verified?(draft.action==='restore'?'确认立即恢复':'确认立即剔除'):'核验方案';
  $('save').disabled=busy||finished||errors.length>0||!!verified&&!draft.confirmed;
  $('confirm-row').hidden=!verified||finished;$('verified-result').hidden=!verified;
@@ -51,10 +52,19 @@ for(const el of host.querySelectorAll('[name=action],[name=scope]'))el.addEventL
 function invalidate(){if(!source||isDemo)return;stale=true;invalidateVerification();draft.confirmed=false;$('confirmed').checked=false;saveVersion++;$('message').textContent='表格发生变化，保留当前调整供参考，请重新读取需求。';render();}
 async function load(){if(busy)return;if(draft&&saveVersion&& !confirm('重新读取会替换当前标准方案，是否继续？'))return;setBusy(true);$('error').textContent='';
  try{selectedRecords=[initialSource];
- const next=selectedRecords[0];unwatch?.();source=next;draft=fromSource(next);stale=false;saveVersion=0;valuesToControls();render();$('saved').textContent='';$('message').textContent=isDemo?'离线演示':`已读取 ${selectedRecords.length} 条申请`;
- if(!isDemo)unwatch=await watchRecord(source.tableId,async()=>{if(busy||finished)return;try{for(const member of members){const latest=await readSelected(member.recordId);if(fingerprint(latest)!==fingerprint(member)){invalidate();break;}}}catch{if(!busy&&!finished)invalidate();}});
+ const next=selectedRecords[0];unwatch?.();source=next;draft=fromSource(next);stale=false;readIssue='';saveVersion=0;valuesToControls();render();$('saved').textContent='';$('message').textContent=isDemo?'离线演示':`已读取 ${selectedRecords.length} 条申请`;
+ if(!isDemo)unwatch=await watchRecord(source.tableId,async()=>{if(busy||finished)return;try{await refreshSource();}catch{} });
  }catch(e){fail(e);}finally{setBusy(false);render();}}
-async function ensureFresh(){if(stale)throw Error('源需求已变化，请重新读取。');if(!isDemo){for(const member of members){const latest=await readSelected(member.recordId);if(fingerprint(latest)!==fingerprint(member)){invalidate();throw Error('需求已变化，原预览失效，请重新读取。');}}}}
+async function refreshSource(){
+ try{
+  const fresh=await checkFreshness(members,readOriginal);
+  readIssue='';
+  if(!fresh){if(!stale)invalidate();return false;}
+  if(stale){stale=false;invalidateVerification();saveVersion++;}
+  render();return true;
+ }catch(error){readIssue=error.message;invalidateVerification();render();throw error;}
+}
+async function ensureFresh(){if(!isDemo&&!(await refreshSource()))throw Error('原申请的活动或范围已变化，请重新读取。');}
 $('read').onclick=load;
 $('connect').onclick=async()=>{if(busy)return;$('connection').hidden=false;$('connect').disabled=true;$('connection').textContent='正在检查本机工作台';try{const r=await fetch('/api/workbench/health');const d=await r.json();$('connection').textContent=d.connected?`工作台在线（${d.version}）；真实核验与执行接口尚未接入插件`:'工作台未连接；仍可编辑标准预览';}catch{$('connection').textContent='本地插件服务不可用，请通过启动文件打开';}finally{$('connect').disabled=false;}};
 if(publicSite)$('connect').hidden=true;
