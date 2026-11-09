@@ -1,5 +1,5 @@
 export const names = {regionActivityId:'区域活动ID',regionActivityName:'区域活动名称',activityId:'总部冲突活动ID',activityName:'总部冲突活动名称',activityType:'总部冲突活动类型',owner:'总部活动设置人',stores:'剔除门店/区域',start:'区域活动开始时间',end:'区域活动结束时间',status:'需求状态'};
-export const fieldAliases={regionActivityId:['区域活动ID回传','区域活动ID','区域活动id','区域活动 ID'],owner:['总部活动设置人','总部活动剔除人','总部负责人'],stores:['剔除门店/区域','剔除门店/区域（标准名称）']};
+export const fieldAliases={activityId:['总部冲突活动ID','总部活动ID'],activityName:['总部冲突活动名称','总部冲突活动名','总部活动名称','总部活动名'],activityType:['总部冲突活动类型','总部活动类型'],regionActivityId:['区域活动ID回传','区域活动ID','区域活动id','区域活动 ID'],owner:['总部活动设置人','总部活动剔除人','总部负责人'],stores:['剔除门店/区域','剔除门店/区域（标准名称）']};
 export const types=['限时折扣','特惠加购','满M件N折','优惠券包','广告管理'];
 export function text(v){if(v==null)return '';if(typeof v==='string')return v;if(typeof v==='number')return String(v);if(Array.isArray(v))return v.map(text).filter(Boolean).join('、');if(v.users)return text(v.users);if(v.text!=null)return text(v.text);if(v.name!=null)return text(v.name);if(v.value!=null)return text(v.value);return '';}
 export function people(v){if(!v)return [];if(v.users)return people(v.users);if(Array.isArray(v))return v.flatMap(people);return v.id&&v.name?[{id:String(v.id),name:String(v.name)}]:[];}
