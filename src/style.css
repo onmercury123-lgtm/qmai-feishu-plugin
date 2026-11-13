@@ -53,3 +53,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 #batch-status.has-records{color:var(--ui-purple-action);font-weight:400}#batch-status.has-records:before{background:var(--ui-purple-action)}
 
+.plugin-connection{display:inline-flex;align-items:center;gap:10px;margin-top:12px;padding:3px 12px;border:1px solid var(--ui-border);border-radius:12px;background:#fff;color:var(--ui-text-secondary);font-size:12px}
+.plugin-connection .ghost{border-left:1px solid var(--ui-border);border-radius:0;padding-left:10px}
+.plugin-connection span:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px}
+.plugin-connection .is-connected{color:var(--ui-success)}
