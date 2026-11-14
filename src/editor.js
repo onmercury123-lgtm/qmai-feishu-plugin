@@ -76,7 +76,7 @@ async function execute(){
  try{
   await ensureFresh();await bridge.open();
   const plan=makePlan(source,{...draft,confirmed:true}),p=globalThis.WorkbenchHandoff.validate({version:2,...plan.standard,participationActivities:groupParticipation(source,draft),sourceRecords:members.map(m=>({baseId:m.baseId||'',tableId:m.tableId,recordId:m.recordId,stores:storeLines(m.display.stores)}))});
-  const response=await bridge.prepare(p);if(version!==saveVersion)throw Error('方案已变化，请重新执行');await ensureFresh();
+  const response=await bridge.prepare(p).catch(error=>{if(/fetch failed|ECONNREFUSED|ECONNRESET|需要重新登录/i.test(error.message))bridge.qmaiUnavailable=true;throw error;});bridge.qmaiUnavailable=false;if(version!==saveVersion)throw Error('方案已变化，请重新执行');await ensureFresh();
   $('execution-result').textContent='核验通过，正在'+(draft.action==='restore'?'恢复':'剔除')+'…';submitting=true;
   const message=await bridge.submit(response.ticket);finished=true;const result=message.result;
   $('execution-result').textContent=result.status==='success'?'已完成':result.status==='partial'?'部分完成，请查看工作台同步记录':result.error||'结果待核实，请查看工作台同步记录';

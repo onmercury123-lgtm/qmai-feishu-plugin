@@ -14,8 +14,8 @@ const connectionStatus=document.getElementById('connection-status');
 const connectionError=document.getElementById('connection-error');
 function paintConnection(){
  if(connectButton.disabled)return;
- const connected=bridge.isConnected();
- connectionStatus.textContent=connected?'工作台已连接':'工作台未连接';
+ const connected=bridge.isConnected()&&!bridge.qmaiUnavailable;
+ connectionStatus.textContent=connected?'工作台已连接':bridge.isConnected()?'企迈连接异常':'工作台未连接';
  connectionStatus.classList.toggle('is-connected',connected);
 }
 connectButton.onclick=async()=>{
@@ -23,8 +23,8 @@ connectButton.onclick=async()=>{
  connectButton.disabled=true;
  connectionError.textContent='';
  connectionStatus.textContent='正在连接…';
- try{await bridge.open();}
- catch(error){connectionError.textContent=error.message;}
+ try{await bridge.startEdge();bridge.qmaiUnavailable=false;}
+ catch(error){bridge.qmaiUnavailable=true;connectionError.textContent=error.message;}
  finally{connectButton.disabled=false;paintConnection();}
 };
 window.setInterval(paintConnection,1500);
@@ -46,7 +46,7 @@ execute.onclick=async()=>{
  let connected;try{connected=bridge.open();connected.catch(()=>{});}catch(e){error.textContent=e.message;running=false;read.disabled=false;execute.disabled=false;return;}
  list.inert=true;receipts.hidden=true;retryArea.replaceChildren();progress.textContent='正在连接本机后台…';let done=0,failed=0;
  try{await connected;bridge.startBatch?.();for(let i=0;i<editors.length;i++){
-  receipts.children[i].hidden=false;progress.textContent='正在处理 '+(i+1)+' / '+editors.length;const result=await editors[i].execute();
+  receipts.children[i].hidden=false;progress.textContent='正在处理 '+(i+1)+' / '+editors.length;const result=await editors[i].execute();paintConnection();
   if(result.status==='success'||result.status==='skipped')done++;else failed++;
   if(result.status==='uncertain'){error.textContent='执行结果待核实，剩余记录未执行，请查看工作台同步记录。';break;}
  }if(!error.textContent||error.textContent.startsWith('正在')){const failure=[...receipts.querySelectorAll('.receipt-row')].find(row=>{const message=row.querySelector('p').textContent;return message&&!message.startsWith('已完成');});const reason=failure?.querySelector('p').textContent.replace(/\s+/g,' ').trim();progress.textContent='已完成 '+done+' 个任务'+(failed?'，未完成 '+failed+' 个任务':'')+(reason?'；'+reason:'');}const details=receipts.textContent;progress.title=details;if(details.includes('表格回填失败')){const row=[...receipts.querySelectorAll('.receipt-row p')].find(p=>p.textContent.includes('表格回填失败'));progress.textContent=row.textContent.replace('仅重试回填','').replace(/\s+/g,' ').trim();}for(const button of receipts.querySelectorAll('button')){const row=button.closest('.receipt-row');const retry=button.onclick;button.onclick=async()=>{await retry();progress.textContent=row.querySelector('p').textContent.split('\n')[0];};retryArea.append(button);}}
