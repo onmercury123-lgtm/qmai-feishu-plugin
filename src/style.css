@@ -61,4 +61,4 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .preview-heading-row{flex-wrap:wrap}
 .preview-heading-row .plugin-connection{margin:0 0 0 auto}
 .plugin-connection .ghost{display:inline-flex;align-items:center;gap:5px}
-.preview-read-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:20px}.preview-read-row .read-button{margin-left:auto;flex-shrink:0}
+.preview-status-area.preview-read-row{display:flex;align-items:center;gap:12px;margin-top:20px}.preview-read-row .read-button{flex-shrink:0}.preview-read-row #batch-status{margin:0;min-width:0;overflow-wrap:anywhere}
