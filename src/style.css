@@ -57,3 +57,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .plugin-connection .ghost{border-left:1px solid var(--ui-border);border-radius:0;padding-left:10px}
 .plugin-connection span:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px}
 .plugin-connection .is-connected{color:var(--ui-success)}
+
+.preview-heading-row{flex-wrap:wrap}
+.preview-heading-row .plugin-connection{margin:0 0 0 auto}
+.plugin-connection .ghost{display:inline-flex;align-items:center;gap:5px}
+.preview-read-row{display:flex;justify-content:flex-end;margin-top:10px}
