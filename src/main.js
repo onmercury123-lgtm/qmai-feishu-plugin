@@ -23,7 +23,7 @@ connectButton.onclick=async()=>{
  connectButton.disabled=true;
  connectionError.textContent='';
  connectionStatus.textContent='正在连接…';
- try{await bridge.open({preferPopup:true});}
+ try{await bridge.open();}
  catch(error){connectionError.textContent=error.message;}
  finally{connectButton.disabled=false;paintConnection();}
 };
